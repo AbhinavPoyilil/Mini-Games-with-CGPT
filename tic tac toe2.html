@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tic Tac Toe</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #222;
+    color: #fff;
+  }
+  h1 {
+    margin-top: 20px;
+    font-size: 2.5em;
+    color: #f9d342;
+  }
+  #difficulty-buttons {
+    margin-bottom: 15px;
+  }
+  button {
+    padding: 10px 20px;
+    margin: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    background: #f9d342;
+    color: #222;
+    font-weight: bold;
+    transition: transform 0.2s, background 0.2s;
+  }
+  button:hover {
+    background: #ffeb6e;
+    transform: scale(1.05);
+  }
+  #game {
+    display: grid;
+    grid-template-columns: repeat(3, 120px);
+    grid-gap: 5px;
+    margin: 20px auto;
+    width: max-content;
+  }
+  .cell {
+    width: 120px;
+    height: 120px;
+    background: #333;
+    font-size: 2.5em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .cell:hover {
+    background: #444;
+    transform: scale(1.05);
+  }
+  .cell.taken {
+    cursor: not-allowed;
+    background: #555;
+  }
+  #status {
+    margin-top: 15px;
+    font-size: 1.2em;
+    color: #f9d342;
+  }
+
+  /* WIN/LOSE/TIE animations */
+  @keyframes winPulse {
+    0%, 100% { background-color: #4caf50; }
+    50% { background-color: #81c784; }
+  }
+  @keyframes losePulse {
+    0%, 100% { background-color: #f44336; }
+    50% { background-color: #e57373; }
+  }
+  @keyframes tiePulse {
+    0%, 100% { background-color: #2196f3; }
+    50% { background-color: #64b5f6; }
+  }
+  .win-animation .cell {
+    animation: winPulse 0.5s ease-in-out alternate 3;
+  }
+  .lose-animation .cell {
+    animation: losePulse 0.5s ease-in-out alternate 3;
+  }
+  .tie-animation .cell {
+    animation: tiePulse 0.5s ease-in-out alternate 3;
+  }
+</style>
+</head>
+<body>
+
+<h1>Tic Tac Toe</h1>
+
+<div id="difficulty-buttons">
+  <button onclick="startGame('easy')">Easy</button>
+  <button onclick="startGame('medium')">Medium</button>
+  <button onclick="startGame('hard')">Hard</button>
+  <button onclick="startGame('multiplayer')">Multiplayer</button>
+</div>
+
+<div id="game"></div>
+<div id="status">Choose a mode to start</div>
+
+<script>
+let board = Array(9).fill(null);
+let player = 'X';
+let ai = 'O';
+let difficulty = null;
+let gameOver = false;
+let playerTurn = true;
+let multiplayer = false;
+
+const gameDiv = document.getElementById("game");
+const statusDiv = document.getElementById("status");
+const difficultyDiv = document.getElementById("difficulty-buttons");
+
+function startGame(mode) {
+  board.fill(null);
+  difficulty = mode;
+  multiplayer = (mode === 'multiplayer');
+  gameOver = false;
+
+  gameDiv.className = ""; // remove any animation class
+
+  if (!multiplayer) {
+    playerTurn = Math.random() < 0.5;
+    statusDiv.textContent = playerTurn ? "Your turn!" : "AI's turn...";
+  } else {
+    playerTurn = true;
+    statusDiv.textContent = "Player X's turn!";
+  }
+
+  difficultyDiv.style.display = "none";
+  renderBoard();
+
+  if (!playerTurn && !multiplayer) {
+    setTimeout(aiMove, 500);
+  }
+}
+
+function renderBoard() {
+  gameDiv.innerHTML = "";
+  board.forEach((cell, i) => {
+    const cellDiv = document.createElement("div");
+    cellDiv.className = "cell" + (cell ? " taken" : "");
+    cellDiv.textContent = cell ? cell : "";
+    cellDiv.addEventListener("click", () => handleMove(i));
+    gameDiv.appendChild(cellDiv);
+  });
+}
+
+function handleMove(i) {
+  if (!difficulty) {
+    alert("Please choose a mode first!");
+    return;
+  }
+  if (board[i] || gameOver) return;
+
+  if (multiplayer) {
+    board[i] = playerTurn ? 'X' : 'O';
+    renderBoard();
+    if (checkWinner(board, board[i])) {
+      statusDiv.textContent = `Player ${board[i]} wins!`;
+      return endGame(board[i] === 'X' ? "win" : "lose");
+    }
+    if (!board.includes(null)) {
+      statusDiv.textContent = "It's a tie!";
+      return endGame("tie");
+    }
+    playerTurn = !playerTurn;
+    statusDiv.textContent = `Player ${playerTurn ? 'X' : 'O'}'s turn!`;
+    return;
+  }
+
+  if (!playerTurn) return;
+  board[i] = player;
+  renderBoard();
+  if (checkWinner(board, player)) {
+    statusDiv.textContent = "You win!";
+    return endGame("win");
+  }
+  if (!board.includes(null)) {
+    statusDiv.textContent = "It's a tie!";
+    return endGame("tie");
+  }
+  playerTurn = false;
+  statusDiv.textContent = "AI's turn...";
+  setTimeout(aiMove, 500);
+}
+
+function aiMove() {
+  if (gameOver) return;
+  let move;
+  if (difficulty === "easy") {
+    move = easyMove();
+  } else if (difficulty === "medium") {
+    move = mediumMove();
+  } else {
+    move = hardMove();
+  }
+  board[move] = ai;
+  renderBoard();
+  if (checkWinner(board, ai)) {
+    statusDiv.textContent = "AI wins!";
+    return endGame("lose");
+  }
+  if (!board.includes(null)) {
+    statusDiv.textContent = "It's a tie!";
+    return endGame("tie");
+  }
+  playerTurn = true;
+  statusDiv.textContent = "Your turn!";
+}
+
+function easyMove() {
+  let available = board.map((v, i) => v ? null : i).filter(v => v !== null);
+  return available[Math.floor(Math.random() * available.length)];
+}
+
+function mediumMove() {
+  let move = findWinningMove(ai);
+  if (move !== null) return move;
+  move = findWinningMove(player);
+  if (move !== null) return move;
+  return easyMove();
+}
+
+function hardMove() {
+  if (board.every(v => v === null)) {
+    return [0, 2, 4, 6, 8][Math.floor(Math.random() * 5)];
+  }
+  return minimax(board, ai).index;
+}
+
+function findWinningMove(letter) {
+  for (let i = 0; i < 9; i++) {
+    if (!board[i]) {
+      board[i] = letter;
+      if (checkWinner(board, letter)) {
+        board[i] = null;
+        return i;
+      }
+      board[i] = null;
+    }
+  }
+  return null;
+}
+
+function checkWinner(b, letter) {
+  const wins = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+  return wins.some(combo => combo.every(i => b[i] === letter));
+}
+
+function minimax(newBoard, turn) {
+  const availSpots = newBoard.map((v, i) => v ? null : i).filter(v => v !== null);
+
+  if (checkWinner(newBoard, player)) return { score: -10 };
+  if (checkWinner(newBoard, ai)) return { score: 10 };
+  if (availSpots.length === 0) return { score: 0 };
+
+  let moves = [];
+  for (let spot of availSpots) {
+    let move = { index: spot };
+    newBoard[spot] = turn;
+    move.score = (turn === ai) ? minimax(newBoard, player).score : minimax(newBoard, ai).score;
+    newBoard[spot] = null;
+    moves.push(move);
+  }
+
+  let bestMove;
+  if (turn === ai) {
+    bestMove = moves.reduce((best, m) => m.score > best.score ? m : best);
+  } else {
+    bestMove = moves.reduce((best, m) => m.score < best.score ? m : best);
+  }
+  return bestMove;
+}
+
+function endGame(result) {
+  gameOver = true;
+
+  // Add splash animation
+  if (result === "win") {
+    gameDiv.classList.add("win-animation");
+  } else if (result === "lose") {
+    gameDiv.classList.add("lose-animation");
+  } else if (result === "tie") {
+    gameDiv.classList.add("tie-animation");
+  }
+
+  setTimeout(() => {
+    difficultyDiv.style.display = "block";
+    statusDiv.textContent = "Choose a mode to start";
+    board.fill(null);
+    renderBoard();
+    difficulty = null;
+    gameDiv.className = "";
+  }, 1500);
+}
+
+// Init
+renderBoard();
+</script>
+</body>
+</html>
