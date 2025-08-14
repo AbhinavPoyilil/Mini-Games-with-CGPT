@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Animal Hangman</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #4facfe, #00f2fe);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    color: #fff;
+    overflow-x: hidden;
+    transition: background 0.5s ease;
+  }
+  h1 {
+    margin-bottom: 5px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  }
+  #difficultyContainer {
+    margin: 20px 0;
+    animation: fadeIn 1s ease-in-out;
+  }
+  select, button {
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: none;
+    font-size: 1rem;
+    margin-top: 10px;
+    cursor: pointer;
+  }
+  #word {
+    font-size: 2.4rem;
+    letter-spacing: 14px;
+    margin: 20px 0;
+    font-weight: bold;
+    text-transform: uppercase;
+    animation: fadeIn 0.5s ease;
+  }
+  #lives { 
+    margin-top: 8px; 
+    font-size: 1.2rem; 
+    transition: transform 0.2s;
+  }
+  #message {
+    font-size: 1.4rem;
+    margin-top: 15px;
+    font-weight: bold;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  }
+  #reset {
+    margin-top: 20px;
+    border-radius: 999px;
+    background: #ff9800;
+    color: #fff;
+  }
+  #reset:hover { background: #e68900; }
+  #hangmanCanvas {
+    border: 2px solid #fff;
+    margin-top: 20px;
+    background: #1e1e1e;
+    border-radius: 6px;
+  }
+
+  /* Animations */
+  @keyframes fadeIn {
+    from {opacity: 0;}
+    to {opacity: 1;}
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
+  }
+  .correctFlash {
+    color: #00ff7f;
+    animation: fadeIn 0.3s ease;
+  }
+  .wrongShake {
+    color: #ff4d4d;
+    animation: shake 0.3s ease;
+  }
+
+  /* Splash effects */
+  .correctSplash {
+    animation: correctBg 0.5s ease;
+  }
+  .wrongSplash {
+    animation: wrongBg 0.5s ease;
+  }
+  @keyframes correctBg {
+    0% { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+    50% { background: #00ff7f; }
+    100% { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+  }
+  @keyframes wrongBg {
+    0% { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+    50% { background: #ff4d4d; }
+    100% { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+  }
+</style>
+</head>
+<body>
+  <h1>🐾 Animal Hangman</h1>
+  
+  <div id="difficultyContainer">
+    <label for="difficulty">Choose Difficulty:</label><br>
+    <select id="difficulty">
+      <option value="easy">Easy (3-5 letters)</option>
+      <option value="medium">Medium (6-8 letters)</option>
+      <option value="hard">Hard (9+ letters)</option>
+    </select>
+    <button id="startGame">Start Game</button>
+  </div>
+
+  <canvas id="hangmanCanvas" width="200" height="200" style="display:none;"></canvas>
+  <div id="word"></div>
+  <div id="lives"></div>
+  <div id="message"></div>
+  <button id="reset" style="display:none;">🔄 Reset</button>
+
+<script>
+let chosenWord = "";
+let guessedLetters = [];
+let wrongGuesses = 0;
+const maxWrong = 6;
+let gameOver = false;
+
+const wordEl = document.getElementById("word");
+const livesEl = document.getElementById("lives");
+const messageEl = document.getElementById("message");
+const resetBtn = document.getElementById("reset");
+const difficultySelect = document.getElementById("difficulty");
+const startGameBtn = document.getElementById("startGame");
+const difficultyContainer = document.getElementById("difficultyContainer");
+const canvas = document.getElementById("hangmanCanvas");
+const ctx = canvas.getContext("2d");
+
+const animals = {
+  easy: ["cat","dog","cow","bat","owl","bee","rat","fox","hen","ant"],
+  medium: ["tiger","zebra","panda","camel","eagle","sheep","whale","otter","koala","goose"],
+  hard: ["alligator","chimpanzee","hippopotamus","rhinoceros","kangaroo","porcupine","armadillo","caterpillar"]
+};
+
+function pickAnimal(difficulty) {
+  const list = animals[difficulty];
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function displayWord(correct) {
+  wordEl.textContent = chosenWord
+    .split("")
+    .map(letter => guessedLetters.includes(letter) ? letter : "_")
+    .join(" ");
+
+  wordEl.classList.remove("correctFlash", "wrongShake");
+  if (correct === true) {
+    wordEl.classList.add("correctFlash");
+  } else if (correct === false) {
+    wordEl.classList.add("wrongShake");
+  }
+}
+
+function splashEffect(correct) {
+  document.body.classList.remove("correctSplash", "wrongSplash");
+  void document.body.offsetWidth; // Force reflow
+  if (correct) {
+    document.body.classList.add("correctSplash");
+  } else {
+    document.body.classList.add("wrongSplash");
+  }
+}
+
+function handleGuess(letter) {
+  if (guessedLetters.includes(letter) || wrongGuesses >= maxWrong || gameOver) return;
+  
+  if (chosenWord.includes(letter)) {
+    guessedLetters.push(letter);
+    splashEffect(true);
+    displayWord(true);
+    updateLives(true);
+    checkWin();
+  } else {
+    wrongGuesses++;
+    splashEffect(false);
+    drawHangman(wrongGuesses);
+    updateLives(false);
+    checkLose();
+  }
+}
+
+function updateLives(correct) {
+  livesEl.textContent = `❤️ Lives left: ${maxWrong - wrongGuesses}`;
+  livesEl.classList.remove("correctFlash", "wrongShake");
+  if (correct === true) {
+    livesEl.classList.add("correctFlash");
+  } else if (correct === false) {
+    livesEl.classList.add("wrongShake");
+  }
+}
+
+function checkWin() {
+  if (chosenWord.split("").every(l => guessedLetters.includes(l))) {
+    messageEl.textContent = "🎉 You Win!";
+    gameOver = true;
+  }
+}
+
+function checkLose() {
+  if (wrongGuesses >= maxWrong) {
+    messageEl.textContent = `💀 You Lose! The word was: ${chosenWord.toUpperCase()}`;
+    gameOver = true;
+  }
+}
+
+function drawHangman(stage) {
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#fff";
+  if (stage === 1) { ctx.beginPath(); ctx.moveTo(10,190); ctx.lineTo(190,190); ctx.stroke(); }
+  if (stage === 2) { ctx.beginPath(); ctx.moveTo(50,190); ctx.lineTo(50,20); ctx.lineTo(120,20); ctx.lineTo(120,40); ctx.stroke(); }
+  if (stage === 3) { ctx.beginPath(); ctx.arc(120,55,15,0,Math.PI*2); ctx.stroke(); }
+  if (stage === 4) { ctx.beginPath(); ctx.moveTo(120,70); ctx.lineTo(120,120); ctx.stroke(); }
+  if (stage === 5) { ctx.beginPath(); ctx.moveTo(120,80); ctx.lineTo(90,100); ctx.moveTo(120,80); ctx.lineTo(150,100); ctx.stroke(); }
+  if (stage === 6) { ctx.beginPath(); ctx.moveTo(120,120); ctx.lineTo(90,150); ctx.moveTo(120,120); ctx.lineTo(150,150); ctx.stroke(); }
+}
+
+function startGame() {
+  gameOver = false;
+  guessedLetters = [];
+  wrongGuesses = 0;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  chosenWord = pickAnimal(difficultySelect.value);
+  difficultyContainer.style.display = "none";
+  canvas.style.display = "block";
+  resetBtn.style.display = "inline-block";
+  displayWord();
+  updateLives();
+  messageEl.textContent = "";
+}
+
+resetBtn.addEventListener("click", () => {
+  difficultyContainer.style.display = "block";
+  canvas.style.display = "none";
+  resetBtn.style.display = "none";
+  wordEl.textContent = "";
+  livesEl.textContent = "";
+  messageEl.textContent = "";
+});
+
+startGameBtn.addEventListener("click", startGame);
+
+document.addEventListener("keypress", (e) => {
+  if (gameOver) return;
+  const letter = e.key.toLowerCase();
+  if (letter >= "a" && letter <= "z") {
+    e.preventDefault();
+    handleGuess(letter);
+  }
+});
+</script>
+</body>
+</html>
